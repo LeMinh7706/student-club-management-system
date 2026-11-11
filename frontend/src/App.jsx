@@ -1,45 +1,8 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
-const initialClubs = [
-  {
-    id: 1,
-    name: "UEH Marketing Club",
-    category: "Marketing",
-    members: 120,
-    description: "Nơi kết nối những bạn trẻ yêu thích Marketing, sáng tạo và truyền thông.",
-    emoji: "📣",
-    color: "orange",
-  },
-  {
-    id: 2,
-    name: "UEH English Club",
-    category: "Ngoại ngữ",
-    members: 95,
-    description: "Cùng nhau học hỏi, thực hành tiếng Anh và phát triển kỹ năng giao tiếp.",
-    emoji: "🌎",
-    color: "blue",
-  },
-  {
-    id: 3,
-    name: "UEH Technology Club",
-    category: "Công nghệ",
-    members: 150,
-    description: "Khám phá công nghệ, lập trình và cùng phát triển những sản phẩm thú vị.",
-    emoji: "💻",
-    color: "purple",
-  },
-  {
-    id: 4,
-    name: "UEH Volunteer Club",
-    category: "Tình nguyện",
-    members: 180,
-    description: "Lan tỏa giá trị tích cực thông qua các hoạt động cộng đồng.",
-    emoji: "💚",
-    color: "green",
-  },
-];
+const API_URL = "http://localhost:5000/api/clubs";
 
 function App() {
   const [role, setRole] = useState("student");
@@ -48,32 +11,99 @@ function App() {
   const [category, setCategory] = useState("Tất cả");
   const [registered, setRegistered] = useState([]);
   const [requests, setRequests] = useState([]);
-  const categories = ["Tất cả", "Marketing", "Ngoại ngữ", "Công nghệ", "Tình nguyện"];
 
-  const filteredClubs = initialClubs.filter((club) => {
-    const matchSearch = club.name.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = category === "Tất cả" || club.category === category;
+  // Dữ liệu câu lạc bộ lấy từ MongoDB
+  const [clubs, setClubs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Gọi API khi mở website
+  useEffect(() => {
+    const fetchClubs = async () => {
+      try {
+        const response = await fetch(API_URL);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Không thể tải câu lạc bộ");
+        }
+
+        setClubs(result.data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClubs();
+  }, []);
+
+  // Tự động lấy danh mục từ dữ liệu MongoDB
+  const categories = [
+    "Tất cả",
+    ...new Set(clubs.map((club) => club.category)),
+  ];
+
+  const filteredClubs = clubs.filter((club) => {
+    const matchSearch = club.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    const matchCategory =
+      category === "Tất cả" || club.category === category;
+
     return matchSearch && matchCategory;
   });
 
-  function registerClub(clubId) {
-  if (!registered.includes(clubId)) {
-    const club = initialClubs.find((item) => item.id === clubId);
+  
+async function registerClub(clubId) {
+  if (registered.includes(clubId)) return;
 
+  const club = clubs.find((item) => item._id === clubId);
+
+  if (!club) return;
+
+  try {
+    const response = await fetch(`${API_URL}/${clubId}/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        studentName: "Minh Anh",
+        studentEmail: "minhanh@ueh.edu.vn",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Đăng ký thất bại");
+    }
+
+    // Cập nhật giao diện sau khi MongoDB lưu thành công
     setRegistered((previous) => [...previous, clubId]);
 
     setRequests((previous) => [
       ...previous,
       {
-        id: Date.now(),
-        name: "Minh Anh",
+        id: result.data._id,
+        name: result.data.studentName,
         club: club.name,
-        email: "minhanh@ueh.edu.vn",
-        status: "pending",
+        email: result.data.studentEmail,
+        status: result.data.status,
       },
     ]);
+
+    alert("Đăng ký tham gia câu lạc bộ thành công!");
+  } catch (error) {
+    alert(error.message);
   }
 }
+
+
+
 
   function updateRequest(id, status) {
     setRequests(
@@ -212,7 +242,7 @@ function App() {
                 <h2>Khám phá câu lạc bộ</h2>
                 <p>Có rất nhiều cộng đồng thú vị đang chờ bạn tham gia.</p>
               </div>
-              <div className="club-total">✨ {initialClubs.length} câu lạc bộ nổi bật</div>
+              <div className="club-total">✨ {clubs.length} câu lạc bộ nổi bật</div>
             </div>
 
             <div className="search-filter">
@@ -231,32 +261,54 @@ function App() {
                 ))}
               </select>
             </div>
+            {loading && (
+            <div className="empty-state">
+              Đang tải danh sách câu lạc bộ...
+            </div>
+          )}
 
+          {error && (
+            <div className="empty-state">
+              Không thể tải dữ liệu: {error}
+            </div>
+          )}
+            {!loading && !error && (
             <div className="club-grid" id="club-list">
               {filteredClubs.map((club) => (
-                <article className="club-card" key={club.id}>
-                  <div className={`club-cover ${club.color}`}>
-                    <div className="club-emoji">{club.emoji}</div>
+                <article className="club-card" key={club._id}>
+                  <div className={`club-cover ${club.color || "blue"}`}>
+                    <div className="club-emoji">{club.emoji || "🎓"}</div>
                     <span className="club-category">{club.category}</span>
                   </div>
                   <div className="club-info">
                     <h3>{club.name}</h3>
-                    <div className="club-members">👥 {club.members} thành viên</div>
+                    <div className="club-members">
+                      👥 {club.memberCount} thành viên
+                    </div>
                     <p>{club.description}</p>
                     <button
-                      className={registered.includes(club.id) ? "register-button registered" : "register-button"}
-                      onClick={() => registerClub(club.id)}
-                      disabled={registered.includes(club.id)}
+                      className={
+                        registered.includes(club._id)
+                          ? "register-button registered"
+                          : "register-button"
+                      }
+                      onClick={() => registerClub(club._id)}
+                      disabled={registered.includes(club._id)}
                     >
-                      {registered.includes(club.id) ? "✓ Đã gửi yêu cầu" : "Đăng ký tham gia →"}
+                      {registered.includes(club._id)
+                        ? "✓ Đã gửi yêu cầu"
+                        : "Đăng ký tham gia →"}
                     </button>
                   </div>
                 </article>
               ))}
             </div>
+          )}
 
-            {filteredClubs.length === 0 && (
-              <div className="empty-state">Không tìm thấy câu lạc bộ phù hợp.</div>
+            {!loading && !error && filteredClubs.length === 0 && (
+              <div className="empty-state">
+                Không tìm thấy câu lạc bộ phù hợp.
+              </div>
             )}
           </section>
         )}
@@ -271,10 +323,10 @@ function App() {
               </div>
             </div>
             <div className="club-grid">
-              {initialClubs.filter((club) => registered.includes(club.id)).map((club) => (
-                <article className="club-card" key={club.id}>
-                  <div className={`club-cover ${club.color}`}>
-                    <div className="club-emoji">{club.emoji}</div>
+              {clubs.filter((club) => registered.includes(club._id)).map((club) => (
+                <article className="club-card" key={club._id}>
+                  <div className={`club-cover ${club.color || "blue"}`}>
+                    <div className="club-emoji">{club.emoji || "🎓"}</div>
                     <span className="club-category">{club.category}</span>
                   </div>
                   <div className="club-info">
@@ -354,15 +406,15 @@ function App() {
 
             {activePage === "manageclubs" && (
               <div className="club-grid">
-                {initialClubs.map((club) => (
-                  <article className="club-card" key={club.id}>
-                    <div className={`club-cover ${club.color}`}>
-                      <div className="club-emoji">{club.emoji}</div>
+                {clubs.map((club) => (
+                  <article className="club-card" key={club._id}>
+                    <div className={`club-cover ${club.color || "blue"}`}>
+                      <div className="club-emoji">{club.emoji || "🎓"}</div>
                       <span className="club-category">{club.category}</span>
                     </div>
                     <div className="club-info">
                       <h3>{club.name}</h3>
-                      <div className="club-members">👥 {club.members} thành viên</div>
+                      <div className="club-members">👥 {club.memberCount} thành viên</div>
                       <p>{club.description}</p>
                       <span className="status approved-status">Đang hoạt động</span>
                     </div>
