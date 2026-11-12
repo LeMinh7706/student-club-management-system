@@ -5,6 +5,8 @@ require("dotenv").config();
 
 const connectDB = require("./config/database");
 const clubRoutes = require("./routes/clubRoutes");
+const eventRoutes = require("./routes/eventRoutes");
+const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
 
 const app = express();
 
@@ -14,6 +16,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api/clubs", clubRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/event-registrations", eventRegistrationRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

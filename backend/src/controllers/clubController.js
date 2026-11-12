@@ -122,9 +122,138 @@ const registerClub = async (req, res) => {
     });
   }
 };
+// GET /api/clubs/:id/memberships
+const getClubMemberships = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid club ID",
+      });
+    }
+
+    const club = await Club.findById(id);
+
+    if (!club) {
+      return res.status(404).json({
+        success: false,
+        message: "Club not found",
+      });
+    }
+
+    const memberships = await Membership.find({ club: id })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: memberships,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get memberships",
+      error: error.message,
+    });
+  }
+};
+
+// PATCH /api/clubs/memberships/:membershipId/approve
+const approveMembership = async (req, res) => {
+  try {
+    const { membershipId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(membershipId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid membership ID",
+      });
+    }
+
+    const membership = await Membership.findById(membershipId);
+
+    if (!membership) {
+      return res.status(404).json({
+        success: false,
+        message: "Membership not found",
+      });
+    }
+
+    if (membership.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "This request has already been processed",
+      });
+    }
+
+    membership.status = "approved";
+    await membership.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Membership approved successfully",
+      data: membership,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve membership",
+      error: error.message,
+    });
+  }
+};
+
+// PATCH /api/clubs/memberships/:membershipId/reject
+const rejectMembership = async (req, res) => {
+  try {
+    const { membershipId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(membershipId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid membership ID",
+      });
+    }
+
+    const membership = await Membership.findById(membershipId);
+
+    if (!membership) {
+      return res.status(404).json({
+        success: false,
+        message: "Membership not found",
+      });
+    }
+
+    if (membership.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "This request has already been processed",
+      });
+    }
+
+    membership.status = "rejected";
+    await membership.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Membership rejected successfully",
+      data: membership,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject membership",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   getAllClubs,
   getClubById,
   registerClub,
+  getClubMemberships,
+  approveMembership,
+  rejectMembership,
 };
